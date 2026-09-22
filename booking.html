@@ -1,0 +1,14 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Book — CyberCraze</title><link rel="stylesheet" href="assets/style.css"></head><body>
+<nav class="nav"><a class="brand" href="index.html"><span class="brand-dot"></span> CYBER<span>CRAZE</span></a><a class="nav-cta" href="index.html">Home</a></nav>
+<main class="booking-page"><div class="booking-intro"><p class="eyebrow">RESERVE YOUR SESSION</p><h1>Choose your<br><span>game time.</span></h1><p>10 AM–10 PM · Full-hour sessions · Book up to 3 days ahead.</p></div>
+<form id="bookingForm" class="booking-card">
+<div class="form-section"><label>01 · DATE</label><div id="dateChoices" class="choice-row"></div></div>
+<div class="form-section"><label>02 · START TIME</label><div id="timeChoices" class="time-grid"></div></div>
+<div class="form-section"><label>03 · DURATION</label><div id="durationChoices" class="choice-row"></div></div>
+<div class="form-section"><label>04 · PLAYERS</label><div class="player-options"><button type="button" class="player-card active" data-players="1"><b>1</b><span>Player</span><strong>৳100 / hour</strong></button><button type="button" class="player-card" data-players="2"><b>2</b><span>Players · 2 controllers</span><strong>৳150 / hour total</strong></button></div></div>
+<div class="form-section customer-info"><label>05 · YOUR DETAILS</label><input id="customerName" required maxlength="80" placeholder="Your name"><input id="customerPhone" required maxlength="20" inputmode="tel" placeholder="Mobile number"></div>
+<div class="summary"><div><span>Session</span><strong id="summarySession">—</strong></div><div><span>Players</span><strong id="summaryPlayers">1 player</strong></div><div class="total"><span>Total</span><strong id="totalPrice">৳100</strong></div></div>
+<button class="btn primary full" id="confirmBtn">Confirm Booking →</button><p id="formError" class="form-note"></p>
+</form></main>
+<div id="successModal" class="modal hidden"><div class="modal-card"><div class="success-icon">✓</div><p class="eyebrow">BOOKING CONFIRMED</p><h2>You're all set.</h2><p id="successText"></p><a id="waLink" class="btn primary full" target="_blank">WhatsApp CyberCraze</a><br><br><a class="btn full" href="index.html">Done</a></div></div>
+<script src="assets/supabase-config.js"></script><script src="assets/booking-live.js"></script></body></html>
