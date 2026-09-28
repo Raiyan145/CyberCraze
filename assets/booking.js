@@ -1,5 +1,5 @@
 /* =========================================================
-   CYBERCRAZE — BOOKING PAGE
+   CYBERCRAZE — REAL BOOKING SYSTEM
    ========================================================= */
 
 const OPEN_HOUR = 10;
@@ -9,26 +9,14 @@ const MAX_DAYS_AHEAD = 2;
 const PRICE_ONE_PLAYER = 100;
 const PRICE_TWO_PLAYERS = 150;
 
-let selectedDate = null;
-let selectedHour = null;
-let selectedDuration = 1;
-let selectedPlayers = 1;
-
-let bookedSlots = [];
-
 
 /* =========================================================
    ELEMENTS
    ========================================================= */
 
-const dateChoices =
-  document.getElementById("dateChoices");
-
-const timeChoices =
-  document.getElementById("timeChoices");
-
-const durationChoices =
-  document.getElementById("durationChoices");
+const dateChoices = document.getElementById("dateChoices");
+const timeChoices = document.getElementById("timeChoices");
+const durationChoices = document.getElementById("durationChoices");
 
 const playerButtons =
   document.querySelectorAll(".player-card");
@@ -62,7 +50,17 @@ const continueBtn =
 
 
 /* =========================================================
-   DATE HELPERS
+   STATE
+   ========================================================= */
+
+let selectedDate = null;
+let selectedHour = null;
+let selectedDuration = 1;
+let selectedPlayers = 1;
+
+
+/* =========================================================
+   DATE
    ========================================================= */
 
 function localDateString(date) {
@@ -87,20 +85,13 @@ function getAvailableDates() {
 
   today.setHours(0, 0, 0, 0);
 
-  for (
-    let i = 0;
-    i <= MAX_DAYS_AHEAD;
-    i++
-  ) {
+  for (let i = 0; i <= MAX_DAYS_AHEAD; i++) {
 
     const date = new Date(today);
 
-    date.setDate(
-      today.getDate() + i
-    );
+    date.setDate(today.getDate() + i);
 
     dates.push(date);
-
   }
 
   return dates;
@@ -109,26 +100,20 @@ function getAvailableDates() {
 
 function formatDate(date) {
 
-  const options = {
+  return date.toLocaleDateString("en-US", {
     weekday: "short",
     month: "short",
     day: "numeric"
-  };
+  });
 
-  return date.toLocaleDateString(
-    "en-US",
-    options
-  );
 }
 
 
 function formatTime(hour) {
 
-  const suffix =
-    hour >= 12 ? "PM" : "AM";
+  const suffix = hour >= 12 ? "PM" : "AM";
 
-  const h =
-    hour % 12 || 12;
+  const h = hour % 12 || 12;
 
   return `${h}:00 ${suffix}`;
 }
@@ -140,30 +125,16 @@ function formatTime(hour) {
 
 function renderDates() {
 
-  if (!dateChoices) return;
-
   dateChoices.innerHTML = "";
 
-  const dates =
-    getAvailableDates();
+  const dates = getAvailableDates();
 
   dates.forEach((date, index) => {
 
-    const button =
-      document.createElement("button");
+    const button = document.createElement("button");
 
     button.type = "button";
-
-    button.className =
-      "choice";
-
-    if (index === 0) {
-
-      button.classList.add("active");
-
-      selectedDate =
-        localDateString(date);
-    }
+    button.className = "choice";
 
     button.dataset.date =
       localDateString(date);
@@ -174,29 +145,36 @@ function renderDates() {
       </strong>
     `;
 
-    button.addEventListener(
-      "click",
-      () => {
+    if (index === 0) {
 
-        document
-          .querySelectorAll("#dateChoices .choice")
-          .forEach(btn =>
-            btn.classList.remove("active")
-          );
+      button.classList.add("active");
 
-        button.classList.add("active");
+      selectedDate =
+        localDateString(date);
+    }
 
-        selectedDate =
-          button.dataset.date;
+    button.addEventListener("click", () => {
 
-        selectedHour = null;
+      document
+        .querySelectorAll("#dateChoices .choice")
+        .forEach(btn =>
+          btn.classList.remove("active")
+        );
 
-        renderTimes();
+      button.classList.add("active");
 
-        updateSummary();
+      selectedDate =
+        button.dataset.date;
 
-      }
-    );
+      selectedHour = null;
+
+      selectedDuration = 1;
+
+      renderTimes();
+      renderDurations();
+      updateSummary();
+
+    });
 
     dateChoices.appendChild(button);
 
@@ -211,9 +189,12 @@ function renderDates() {
 
 function renderTimes() {
 
-  if (!timeChoices) return;
-
   timeChoices.innerHTML = "";
+
+  const today =
+    localDateString(new Date());
+
+  const now = new Date();
 
   for (
     let hour = OPEN_HOUR;
@@ -233,16 +214,10 @@ function renderTimes() {
     button.textContent =
       formatTime(hour);
 
+
     /*
-      If today and the time has already passed,
-      disable that slot.
+      Past hours are unavailable for today.
     */
-
-    const today =
-      localDateString(new Date());
-
-    const now =
-      new Date();
 
     if (
       selectedDate === today &&
@@ -256,32 +231,27 @@ function renderTimes() {
     }
 
 
-    /*
-      Don't allow a session that would
-      finish after 10 PM.
-    */
+    button.addEventListener("click", () => {
 
-    button.addEventListener(
-      "click",
-      () => {
+      document
+        .querySelectorAll("#timeChoices .time")
+        .forEach(btn =>
+          btn.classList.remove("active")
+        );
 
-        document
-          .querySelectorAll("#timeChoices .time")
-          .forEach(btn =>
-            btn.classList.remove("active")
-          );
+      button.classList.add("active");
 
-        button.classList.add("active");
+      selectedHour =
+        Number(button.dataset.hour);
 
-        selectedHour =
-          Number(button.dataset.hour);
+      selectedDuration = 1;
 
-        renderDurations();
+      renderDurations();
 
-        updateSummary();
+      updateSummary();
 
-      }
-    );
+    });
+
 
     timeChoices.appendChild(button);
 
@@ -296,8 +266,6 @@ function renderTimes() {
 
 function renderDurations() {
 
-  if (!durationChoices) return;
-
   durationChoices.innerHTML = "";
 
   if (selectedHour === null) {
@@ -311,16 +279,6 @@ function renderDurations() {
     return;
   }
 
-
-  /*
-    Example:
-
-    Start 10 AM
-    Maximum duration = 12 hours
-
-    Start 8 PM
-    Maximum duration = 2 hours
-  */
 
   const maxDuration =
     CLOSE_HOUR - selectedHour;
@@ -343,39 +301,39 @@ function renderDurations() {
       duration;
 
     button.textContent =
-      `${duration} ${duration === 1 ? "hour" : "hours"}`;
+      `${duration} ${
+        duration === 1
+          ? "hour"
+          : "hours"
+      }`;
 
 
-    if (
-      duration === selectedDuration
-    ) {
+    if (duration === selectedDuration) {
 
       button.classList.add("active");
 
     }
 
 
-    button.addEventListener(
-      "click",
-      () => {
+    button.addEventListener("click", () => {
 
-        document
-          .querySelectorAll(
-            "#durationChoices .choice"
-          )
-          .forEach(btn =>
-            btn.classList.remove("active")
-          );
+      document
+        .querySelectorAll(
+          "#durationChoices .choice"
+        )
+        .forEach(btn =>
+          btn.classList.remove("active")
+        );
 
-        button.classList.add("active");
+      button.classList.add("active");
 
-        selectedDuration =
-          Number(button.dataset.duration);
+      selectedDuration =
+        Number(button.dataset.duration);
 
-        updateSummary();
+      updateSummary();
 
-      }
-    );
+    });
+
 
     durationChoices.appendChild(button);
 
@@ -385,28 +343,25 @@ function renderDurations() {
 
 
 /* =========================================================
-   PLAYERS
+   PLAYER SELECTION
    ========================================================= */
 
 playerButtons.forEach(button => {
 
-  button.addEventListener(
-    "click",
-    () => {
+  button.addEventListener("click", () => {
 
-      playerButtons.forEach(btn =>
-        btn.classList.remove("active")
-      );
+    playerButtons.forEach(btn =>
+      btn.classList.remove("active")
+    );
 
-      button.classList.add("active");
+    button.classList.add("active");
 
-      selectedPlayers =
-        Number(button.dataset.players);
+    selectedPlayers =
+      Number(button.dataset.players);
 
-      updateSummary();
+    updateSummary();
 
-    }
-  );
+  });
 
 });
 
@@ -417,13 +372,9 @@ playerButtons.forEach(button => {
 
 function getHourlyPrice() {
 
-  if (selectedPlayers === 2) {
-
-    return PRICE_TWO_PLAYERS;
-
-  }
-
-  return PRICE_ONE_PLAYER;
+  return selectedPlayers === 2
+    ? PRICE_TWO_PLAYERS
+    : PRICE_ONE_PLAYER;
 
 }
 
@@ -456,8 +407,7 @@ function updateSummary() {
 
     } else {
 
-      summarySession.textContent =
-        "—";
+      summarySession.textContent = "—";
 
     }
 
@@ -485,67 +435,69 @@ function updateSummary() {
 
 
 /* =========================================================
+   BOOKING CODE
+   ========================================================= */
+
+function generateBookingCode() {
+
+  const random =
+    Math.random()
+      .toString(36)
+      .substring(2, 8)
+      .toUpperCase();
+
+  return `CC-${Date.now().toString().slice(-6)}-${random}`;
+
+}
+
+
+/* =========================================================
    VALIDATION
    ========================================================= */
 
 function validateBooking() {
 
   const name =
-    document.getElementById(
-      "customerName"
-    ).value.trim();
+    document
+      .getElementById("customerName")
+      .value
+      .trim();
 
   const phone =
-    document.getElementById(
-      "customerPhone"
-    ).value.trim();
+    document
+      .getElementById("customerPhone")
+      .value
+      .trim();
 
 
   if (!selectedDate) {
-
     return "Please select a date.";
-
   }
 
 
   if (selectedHour === null) {
-
     return "Please select a start time.";
-
   }
 
 
   if (!selectedDuration) {
-
-    return "Please select your duration.";
-
+    return "Please select duration.";
   }
 
 
   if (!name) {
-
     return "Please enter your name.";
-
   }
 
 
   if (!phone) {
-
     return "Please enter your mobile number.";
-
   }
 
 
-  /*
-    Bangladesh mobile number validation.
-    Accepts:
-
-    01XXXXXXXXX
-    +8801XXXXXXXXX
-  */
-
   const cleanPhone =
     phone.replace(/[\s-]/g, "");
+
 
   const validPhone =
     /^(01[3-9]\d{8}|\+8801[3-9]\d{8})$/
@@ -553,13 +505,119 @@ function validateBooking() {
 
 
   if (!validPhone) {
-
     return "Please enter a valid Bangladesh mobile number.";
-
   }
 
 
   return null;
+
+}
+
+
+/* =========================================================
+   SUPABASE BOOKING
+   ========================================================= */
+
+async function createBooking() {
+
+  const name =
+    document
+      .getElementById("customerName")
+      .value
+      .trim();
+
+
+  const phone =
+    document
+      .getElementById("customerPhone")
+      .value
+      .trim();
+
+
+  const amount =
+    getTotalPrice();
+
+
+  const bookingCode =
+    generateBookingCode();
+
+
+  const response =
+    await fetch(
+      `${window.CC_SUPABASE_URL}/rest/v1/rpc/create_booking`,
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json",
+
+          apikey:
+            window.CC_SUPABASE_ANON_KEY,
+
+          Authorization:
+            `Bearer ${window.CC_SUPABASE_ANON_KEY}`
+        },
+
+        body: JSON.stringify({
+
+          p_booking_code:
+            bookingCode,
+
+          p_customer_name:
+            name,
+
+          p_customer_phone:
+            phone,
+
+          p_booking_date:
+            selectedDate,
+
+          p_start_hour:
+            selectedHour,
+
+          p_duration:
+            selectedDuration,
+
+          p_players:
+            selectedPlayers,
+
+          p_amount:
+            amount
+
+        })
+
+      }
+    );
+
+
+  const data =
+    await response.json();
+
+
+  if (!response.ok) {
+
+    let message =
+      "Booking could not be completed.";
+
+    if (data?.message) {
+      message = data.message;
+    }
+
+    throw new Error(message);
+
+  }
+
+
+  /*
+    Supabase returns the inserted
+    booking row.
+  */
+
+  return {
+    booking: Array.isArray(data)
+      ? data[0]
+      : data
+  };
 
 }
 
@@ -575,7 +633,6 @@ bookingForm?.addEventListener(
     event.preventDefault();
 
     formError.textContent = "";
-
 
     const error =
       validateBooking();
@@ -594,80 +651,90 @@ bookingForm?.addEventListener(
     confirmBtn.disabled = true;
 
     confirmBtn.textContent =
-      "Checking availability...";
+      "Confirming booking...";
 
 
-    /*
-      Database booking will be connected
-      in the next step.
+    try {
 
-      For now we prepare the booking
-      information locally.
-    */
-
-    const booking = {
-
-      name:
-        document
-          .getElementById("customerName")
-          .value
-          .trim(),
-
-      phone:
-        document
-          .getElementById("customerPhone")
-          .value
-          .trim(),
-
-      date:
-        selectedDate,
-
-      startHour:
-        selectedHour,
-
-      duration:
-        selectedDuration,
-
-      players:
-        selectedPlayers,
-
-      hourlyPrice:
-        getHourlyPrice(),
-
-      total:
-        getTotalPrice()
-
-    };
+      const result =
+        await createBooking();
 
 
-    console.log(
-      "CyberCraze booking:",
-      booking
-    );
+      const booking =
+        result.booking;
 
 
-    /*
-      Temporary success message.
+      successText.innerHTML = `
+        <strong>${booking.booking_code}</strong><br><br>
 
-      This will be replaced with the
-      Supabase booking request next.
-    */
+        ${booking.booking_date}<br>
 
-    setTimeout(() => {
+        ${formatTime(booking.start_hour)}
+        ·
+        ${booking.duration}
+        ${
+          booking.duration === 1
+            ? "hour"
+            : "hours"
+        }<br>
 
-      successText.textContent =
-        `${booking.name}, your ${booking.duration}-hour session on ${booking.date} at ${formatTime(booking.startHour)} has been prepared.`;
+        ${
+          booking.players === 1
+            ? "1 player"
+            : "2 players"
+        }<br><br>
+
+        Total:
+        <strong>৳${booking.amount}</strong>
+      `;
+
 
       successModal.classList.remove(
         "hidden"
       );
+
+
+      /*
+        Disable the selected time
+        locally after successful booking.
+      */
+
+      const selectedTimeButton =
+        document.querySelector(
+          `.time[data-hour="${selectedHour}"]`
+        );
+
+      if (selectedTimeButton) {
+
+        selectedTimeButton.disabled = true;
+
+        selectedTimeButton.classList.add(
+          "disabled"
+        );
+
+      }
+
+
+    } catch (error) {
+
+      console.error(
+        "CyberCraze booking error:",
+        error
+      );
+
+
+      formError.textContent =
+        error.message ||
+        "Something went wrong. Please try again.";
+
+    } finally {
 
       confirmBtn.disabled = false;
 
       confirmBtn.textContent =
         "Continue Booking →";
 
-    }, 500);
+    }
 
   }
 );
@@ -684,6 +751,30 @@ continueBtn?.addEventListener(
     successModal.classList.add(
       "hidden"
     );
+
+    bookingForm.reset();
+
+    selectedHour = null;
+
+    selectedDuration = 1;
+
+    selectedPlayers = 1;
+
+    playerButtons.forEach(btn =>
+      btn.classList.remove("active")
+    );
+
+    playerButtons[0]?.classList.add(
+      "active"
+    );
+
+    renderDates();
+
+    renderTimes();
+
+    renderDurations();
+
+    updateSummary();
 
   }
 );
