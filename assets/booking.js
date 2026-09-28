@@ -1,5 +1,5 @@
 /* =========================================================
-   CYBERCRAZE — REAL BOOKING SYSTEM
+   CYBERCRAZE — BOOKING SYSTEM + LIVE AVAILABILITY
    ========================================================= */
 
 const OPEN_HOUR = 10;
@@ -14,9 +14,14 @@ const PRICE_TWO_PLAYERS = 150;
    ELEMENTS
    ========================================================= */
 
-const dateChoices = document.getElementById("dateChoices");
-const timeChoices = document.getElementById("timeChoices");
-const durationChoices = document.getElementById("durationChoices");
+const dateChoices =
+  document.getElementById("dateChoices");
+
+const timeChoices =
+  document.getElementById("timeChoices");
+
+const durationChoices =
+  document.getElementById("durationChoices");
 
 const playerButtons =
   document.querySelectorAll(".player-card");
@@ -58,9 +63,11 @@ let selectedHour = null;
 let selectedDuration = 1;
 let selectedPlayers = 1;
 
+let bookedHours = [];
+
 
 /* =========================================================
-   DATE
+   DATE HELPERS
    ========================================================= */
 
 function localDateString(date) {
@@ -85,11 +92,17 @@ function getAvailableDates() {
 
   today.setHours(0, 0, 0, 0);
 
-  for (let i = 0; i <= MAX_DAYS_AHEAD; i++) {
+  for (
+    let i = 0;
+    i <= MAX_DAYS_AHEAD;
+    i++
+  ) {
 
     const date = new Date(today);
 
-    date.setDate(today.getDate() + i);
+    date.setDate(
+      today.getDate() + i
+    );
 
     dates.push(date);
   }
@@ -100,22 +113,150 @@ function getAvailableDates() {
 
 function formatDate(date) {
 
-  return date.toLocaleDateString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric"
-  });
+  return date.toLocaleDateString(
+    "en-US",
+    {
+      weekday: "short",
+      month: "short",
+      day: "numeric"
+    }
+  );
 
 }
 
 
 function formatTime(hour) {
 
-  const suffix = hour >= 12 ? "PM" : "AM";
+  const suffix =
+    hour >= 12 ? "PM" : "AM";
 
-  const h = hour % 12 || 12;
+  const h =
+    hour % 12 || 12;
 
   return `${h}:00 ${suffix}`;
+}
+
+
+/* =========================================================
+   GET BOOKED HOURS FROM SUPABASE
+   ========================================================= */
+
+async function loadBookedHours() {
+
+  bookedHours = [];
+
+  if (
+    !window.CC_SUPABASE_URL ||
+    !window.CC_SUPABASE_ANON_KEY
+  ) {
+
+    console.warn(
+      "Supabase configuration missing."
+    );
+
+    return;
+
+  }
+
+
+  if (!selectedDate) return;
+
+
+  try {
+
+    const response =
+      await fetch(
+        `${window.CC_SUPABASE_URL}/rest/v1/rpc/get_booked_hours`,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type": "application/json",
+
+            apikey:
+              window.CC_SUPABASE_ANON_KEY,
+
+            Authorization:
+              `Bearer ${window.CC_SUPABASE_ANON_KEY}`
+          },
+
+          body: JSON.stringify({
+            p_booking_date:
+              selectedDate
+          })
+        }
+      );
+
+
+    const data =
+      await response.json();
+
+
+    if (!response.ok) {
+
+      console.error(
+        "Availability error:",
+        data
+      );
+
+      return;
+
+    }
+
+
+    /*
+      Convert bookings into individual
+      blocked hours.
+
+      Example:
+
+      start = 10
+      duration = 3
+
+      Blocks:
+
+      10
+      11
+      12
+    */
+
+    const hours = [];
+
+
+    data.forEach(booking => {
+
+      const start =
+        Number(booking.start_hour);
+
+      const duration =
+        Number(booking.duration);
+
+
+      for (
+        let hour = start;
+        hour < start + duration;
+        hour++
+      ) {
+
+        hours.push(hour);
+
+      }
+
+    });
+
+
+    bookedHours =
+      [...new Set(hours)];
+
+  } catch (error) {
+
+    console.error(
+      "Could not load availability:",
+      error
+    );
+
+  }
+
 }
 
 
@@ -127,58 +268,148 @@ function renderDates() {
 
   dateChoices.innerHTML = "";
 
-  const dates = getAvailableDates();
+  const dates =
+    getAvailableDates();
+
 
   dates.forEach((date, index) => {
 
-    const button = document.createElement("button");
+    const button =
+      document.createElement("button");
 
     button.type = "button";
-    button.className = "choice";
+
+    button.className =
+      "choice";
 
     button.dataset.date =
       localDateString(date);
 
+
     button.innerHTML = `
       <strong>
-        ${index === 0 ? "Today" : formatDate(date)}
+        ${
+          index === 0
+            ? "Today"
+            : formatDate(date)
+        }
       </strong>
     `;
 
+
     if (index === 0) {
 
-      button.classList.add("active");
+      button.classList.add(
+        "active"
+      );
 
       selectedDate =
         localDateString(date);
+
     }
 
-    button.addEventListener("click", () => {
 
-      document
-        .querySelectorAll("#dateChoices .choice")
-        .forEach(btn =>
-          btn.classList.remove("active")
+    button.addEventListener(
+      "click",
+      async () => {
+
+        document
+          .querySelectorAll(
+            "#dateChoices .choice"
+          )
+          .forEach(btn =>
+            btn.classList.remove(
+              "active"
+            )
+          );
+
+
+        button.classList.add(
+          "active"
         );
 
-      button.classList.add("active");
 
-      selectedDate =
-        button.dataset.date;
+        selectedDate =
+          button.dataset.date;
 
-      selectedHour = null;
 
-      selectedDuration = 1;
+        selectedHour = null;
 
-      renderTimes();
-      renderDurations();
-      updateSummary();
+        selectedDuration = 1;
 
-    });
 
-    dateChoices.appendChild(button);
+        timeChoices.innerHTML = `
+          <span style="
+            color:#8d96a3;
+            font-size:12px;
+          ">
+            Checking availability...
+          </span>
+        `;
+
+
+        await loadBookedHours();
+
+
+        renderTimes();
+
+        renderDurations();
+
+        updateSummary();
+
+      }
+    );
+
+
+    dateChoices.appendChild(
+      button
+    );
 
   });
+
+}
+
+
+/* =========================================================
+   CHECK WHETHER A TIME IS BOOKED
+   ========================================================= */
+
+function isHourBooked(hour) {
+
+  return bookedHours.includes(
+    hour
+  );
+
+}
+
+
+/* =========================================================
+   CHECK WHETHER DURATION IS AVAILABLE
+   ========================================================= */
+
+function isDurationAvailable(
+  startHour,
+  duration
+) {
+
+  for (
+    let hour = startHour;
+    hour < startHour + duration;
+    hour++
+  ) {
+
+    if (
+      isHourBooked(hour)
+    ) {
+
+      return false;
+
+    }
+
+  }
+
+
+  return true;
 
 }
 
@@ -192,9 +423,13 @@ function renderTimes() {
   timeChoices.innerHTML = "";
 
   const today =
-    localDateString(new Date());
+    localDateString(
+      new Date()
+    );
 
-  const now = new Date();
+  const now =
+    new Date();
+
 
   for (
     let hour = OPEN_HOUR;
@@ -203,20 +438,29 @@ function renderTimes() {
   ) {
 
     const button =
-      document.createElement("button");
+      document.createElement(
+        "button"
+      );
+
 
     button.type = "button";
 
-    button.className = "time";
+    button.className =
+      "time";
 
-    button.dataset.hour = hour;
+    button.dataset.hour =
+      hour;
+
 
     button.textContent =
       formatTime(hour);
 
 
+    let unavailable = false;
+
+
     /*
-      Past hours are unavailable for today.
+      Past hours today
     */
 
     if (
@@ -224,36 +468,84 @@ function renderTimes() {
       hour <= now.getHours()
     ) {
 
-      button.disabled = true;
-
-      button.classList.add("disabled");
+      unavailable = true;
 
     }
 
 
-    button.addEventListener("click", () => {
+    /*
+      Already booked
+    */
 
-      document
-        .querySelectorAll("#timeChoices .time")
-        .forEach(btn =>
-          btn.classList.remove("active")
-        );
+    if (
+      isHourBooked(hour)
+    ) {
 
-      button.classList.add("active");
+      unavailable = true;
 
-      selectedHour =
-        Number(button.dataset.hour);
-
-      selectedDuration = 1;
-
-      renderDurations();
-
-      updateSummary();
-
-    });
+    }
 
 
-    timeChoices.appendChild(button);
+    if (unavailable) {
+
+      button.disabled = true;
+
+      button.classList.add(
+        "disabled"
+      );
+
+      button.setAttribute(
+        "aria-label",
+        `${formatTime(hour)} unavailable`
+      );
+
+    }
+
+
+    if (!unavailable) {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          document
+            .querySelectorAll(
+              "#timeChoices .time"
+            )
+            .forEach(btn =>
+              btn.classList.remove(
+                "active"
+              )
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          selectedHour =
+            Number(
+              button.dataset.hour
+            );
+
+
+          selectedDuration = 1;
+
+
+          renderDurations();
+
+          updateSummary();
+
+        }
+      );
+
+    }
+
+
+    timeChoices.appendChild(
+      button
+    );
 
   }
 
@@ -268,20 +560,28 @@ function renderDurations() {
 
   durationChoices.innerHTML = "";
 
-  if (selectedHour === null) {
+
+  if (
+    selectedHour === null
+  ) {
 
     durationChoices.innerHTML = `
-      <span style="color:#8d96a3;font-size:12px">
+      <span style="
+        color:#8d96a3;
+        font-size:12px;
+      ">
         Select a start time first.
       </span>
     `;
 
     return;
+
   }
 
 
   const maxDuration =
-    CLOSE_HOUR - selectedHour;
+    CLOSE_HOUR -
+    selectedHour;
 
 
   for (
@@ -291,14 +591,20 @@ function renderDurations() {
   ) {
 
     const button =
-      document.createElement("button");
+      document.createElement(
+        "button"
+      );
+
 
     button.type = "button";
 
-    button.className = "choice";
+    button.className =
+      "choice";
+
 
     button.dataset.duration =
       duration;
+
 
     button.textContent =
       `${duration} ${
@@ -308,34 +614,90 @@ function renderDurations() {
       }`;
 
 
-    if (duration === selectedDuration) {
+    const available =
+      isDurationAvailable(
+        selectedHour,
+        duration
+      );
 
-      button.classList.add("active");
+
+    if (!available) {
+
+      button.disabled = true;
+
+      button.classList.add(
+        "disabled"
+      );
 
     }
 
 
-    button.addEventListener("click", () => {
+    if (
+      duration === selectedDuration &&
+      available
+    ) {
 
-      document
-        .querySelectorAll(
-          "#durationChoices .choice"
-        )
-        .forEach(btn =>
-          btn.classList.remove("active")
-        );
+      button.classList.add(
+        "active"
+      );
 
-      button.classList.add("active");
-
-      selectedDuration =
-        Number(button.dataset.duration);
-
-      updateSummary();
-
-    });
+    }
 
 
-    durationChoices.appendChild(button);
+    if (available) {
+
+      button.addEventListener(
+        "click",
+        () => {
+
+          document
+            .querySelectorAll(
+              "#durationChoices .choice"
+            )
+            .forEach(btn =>
+              btn.classList.remove(
+                "active"
+              )
+            );
+
+
+          button.classList.add(
+            "active"
+          );
+
+
+          selectedDuration =
+            duration;
+
+
+          updateSummary();
+
+        }
+      );
+
+    }
+
+
+    durationChoices.appendChild(
+      button
+    );
+
+  }
+
+
+  /*
+    If current duration became unavailable,
+    automatically select 1 hour.
+  */
+
+  if (
+    !isDurationAvailable(
+      selectedHour,
+      selectedDuration
+    )
+  ) {
+
+    selectedDuration = 1;
 
   }
 
@@ -346,24 +708,39 @@ function renderDurations() {
    PLAYER SELECTION
    ========================================================= */
 
-playerButtons.forEach(button => {
+playerButtons.forEach(
+  button => {
 
-  button.addEventListener("click", () => {
+    button.addEventListener(
+      "click",
+      () => {
 
-    playerButtons.forEach(btn =>
-      btn.classList.remove("active")
+        playerButtons.forEach(
+          btn =>
+            btn.classList.remove(
+              "active"
+            )
+        );
+
+
+        button.classList.add(
+          "active"
+        );
+
+
+        selectedPlayers =
+          Number(
+            button.dataset.players
+          );
+
+
+        updateSummary();
+
+      }
     );
 
-    button.classList.add("active");
-
-    selectedPlayers =
-      Number(button.dataset.players);
-
-    updateSummary();
-
-  });
-
-});
+  }
+);
 
 
 /* =========================================================
@@ -407,7 +784,8 @@ function updateSummary() {
 
     } else {
 
-      summarySession.textContent = "—";
+      summarySession.textContent =
+        "—";
 
     }
 
@@ -446,7 +824,10 @@ function generateBookingCode() {
       .substring(2, 8)
       .toUpperCase();
 
-  return `CC-${Date.now().toString().slice(-6)}-${random}`;
+
+  return `CC-${Date.now()
+    .toString()
+    .slice(-6)}-${random}`;
 
 }
 
@@ -459,44 +840,69 @@ function validateBooking() {
 
   const name =
     document
-      .getElementById("customerName")
+      .getElementById(
+        "customerName"
+      )
       .value
       .trim();
 
+
   const phone =
     document
-      .getElementById("customerPhone")
+      .getElementById(
+        "customerPhone"
+      )
       .value
       .trim();
 
 
   if (!selectedDate) {
+
     return "Please select a date.";
+
   }
 
 
-  if (selectedHour === null) {
+  if (
+    selectedHour === null
+  ) {
+
     return "Please select a start time.";
+
   }
 
 
-  if (!selectedDuration) {
-    return "Please select duration.";
+  if (
+    !isDurationAvailable(
+      selectedHour,
+      selectedDuration
+    )
+  ) {
+
+    return "This session is no longer available. Please choose another time.";
+
   }
 
 
   if (!name) {
+
     return "Please enter your name.";
+
   }
 
 
   if (!phone) {
+
     return "Please enter your mobile number.";
+
   }
 
 
   const cleanPhone =
-    phone.replace(/[\s-]/g, "");
+    phone.replace(
+      /[\s-]/g,
+      ""
+    );
 
 
   const validPhone =
@@ -505,7 +911,9 @@ function validateBooking() {
 
 
   if (!validPhone) {
+
     return "Please enter a valid Bangladesh mobile number.";
+
   }
 
 
@@ -515,21 +923,25 @@ function validateBooking() {
 
 
 /* =========================================================
-   SUPABASE BOOKING
+   CREATE REAL BOOKING
    ========================================================= */
 
 async function createBooking() {
 
   const name =
     document
-      .getElementById("customerName")
+      .getElementById(
+        "customerName"
+      )
       .value
       .trim();
 
 
   const phone =
     document
-      .getElementById("customerPhone")
+      .getElementById(
+        "customerPhone"
+      )
       .value
       .trim();
 
@@ -549,13 +961,16 @@ async function createBooking() {
         method: "POST",
 
         headers: {
-          "Content-Type": "application/json",
+
+          "Content-Type":
+            "application/json",
 
           apikey:
             window.CC_SUPABASE_ANON_KEY,
 
           Authorization:
             `Bearer ${window.CC_SUPABASE_ANON_KEY}`
+
         },
 
         body: JSON.stringify({
@@ -596,27 +1011,43 @@ async function createBooking() {
 
   if (!response.ok) {
 
-    let message =
-      "Booking could not be completed.";
+    /*
+      Convert database error into
+      a customer-friendly message.
+    */
 
-    if (data?.message) {
-      message = data.message;
+    const rawMessage =
+      data?.message ||
+      data?.hint ||
+      "";
+
+
+    if (
+      rawMessage
+        .toLowerCase()
+        .includes("already booked")
+    ) {
+
+      throw new Error(
+        "Sorry, this time was just booked by someone else. Please choose another slot."
+      );
+
     }
 
-    throw new Error(message);
+
+    throw new Error(
+      rawMessage ||
+      "Booking could not be completed."
+    );
 
   }
 
 
-  /*
-    Supabase returns the inserted
-    booking row.
-  */
-
   return {
-    booking: Array.isArray(data)
-      ? data[0]
-      : data
+    booking:
+      Array.isArray(data)
+        ? data[0]
+        : data
   };
 
 }
@@ -634,14 +1065,15 @@ bookingForm?.addEventListener(
 
     formError.textContent = "";
 
-    const error =
+
+    const validationError =
       validateBooking();
 
 
-    if (error) {
+    if (validationError) {
 
       formError.textContent =
-        error;
+        validationError;
 
       return;
 
@@ -664,28 +1096,84 @@ bookingForm?.addEventListener(
         result.booking;
 
 
+      /*
+        Add newly booked hours
+        immediately to local state.
+      */
+
+      for (
+        let hour =
+          Number(
+            booking.start_hour
+          );
+
+        hour <
+          Number(
+            booking.start_hour
+          ) +
+          Number(
+            booking.duration
+          );
+
+        hour++
+      ) {
+
+        bookedHours.push(
+          hour
+        );
+
+      }
+
+
+      bookedHours =
+        [...new Set(bookedHours)];
+
+
       successText.innerHTML = `
-        <strong>${booking.booking_code}</strong><br><br>
+        <strong>
+          ${booking.booking_code}
+        </strong>
 
-        ${booking.booking_date}<br>
+        <br><br>
 
-        ${formatTime(booking.start_hour)}
+        ${booking.booking_date}
+
+        <br>
+
+        ${formatTime(
+          Number(
+            booking.start_hour
+          )
+        )}
+
         ·
+
         ${booking.duration}
         ${
-          booking.duration === 1
+          Number(
+            booking.duration
+          ) === 1
             ? "hour"
             : "hours"
-        }<br>
+        }
+
+        <br>
 
         ${
-          booking.players === 1
+          Number(
+            booking.players
+          ) === 1
             ? "1 player"
             : "2 players"
-        }<br><br>
+        }
+
+        <br><br>
 
         Total:
-        <strong>৳${booking.amount}</strong>
+
+        <strong>
+          ৳${booking.amount}
+        </strong>
       `;
 
 
@@ -695,24 +1183,12 @@ bookingForm?.addEventListener(
 
 
       /*
-        Disable the selected time
-        locally after successful booking.
+        Refresh the visible slots.
       */
 
-      const selectedTimeButton =
-        document.querySelector(
-          `.time[data-hour="${selectedHour}"]`
-        );
+      renderTimes();
 
-      if (selectedTimeButton) {
-
-        selectedTimeButton.disabled = true;
-
-        selectedTimeButton.classList.add(
-          "disabled"
-        );
-
-      }
+      renderDurations();
 
 
     } catch (error) {
@@ -726,6 +1202,19 @@ bookingForm?.addEventListener(
       formError.textContent =
         error.message ||
         "Something went wrong. Please try again.";
+
+
+      /*
+        Reload availability because
+        another customer may have booked
+        the slot meanwhile.
+      */
+
+      await loadBookedHours();
+
+      renderTimes();
+
+      renderDurations();
 
     } finally {
 
@@ -752,7 +1241,9 @@ continueBtn?.addEventListener(
       "hidden"
     );
 
+
     bookingForm.reset();
+
 
     selectedHour = null;
 
@@ -760,21 +1251,32 @@ continueBtn?.addEventListener(
 
     selectedPlayers = 1;
 
-    playerButtons.forEach(btn =>
-      btn.classList.remove("active")
+
+    playerButtons.forEach(
+      btn =>
+        btn.classList.remove(
+          "active"
+        )
     );
+
 
     playerButtons[0]?.classList.add(
       "active"
     );
 
+
     renderDates();
 
-    renderTimes();
+    loadBookedHours()
+      .then(() => {
 
-    renderDurations();
+        renderTimes();
 
-    updateSummary();
+        renderDurations();
+
+        updateSummary();
+
+      });
 
   }
 );
@@ -784,10 +1286,40 @@ continueBtn?.addEventListener(
    INITIALIZE
    ========================================================= */
 
-renderDates();
+async function initializeBookingPage() {
 
-renderTimes();
+  renderDates();
 
-renderDurations();
+  await loadBookedHours();
 
-updateSummary();
+  renderTimes();
+
+  renderDurations();
+
+  updateSummary();
+
+}
+
+
+initializeBookingPage();
+
+
+/* =========================================================
+   AUTO REFRESH AVAILABILITY
+   ========================================================= */
+
+setInterval(
+  async () => {
+
+    if (!selectedDate) return;
+
+
+    await loadBookedHours();
+
+    renderTimes();
+
+    renderDurations();
+
+  },
+  30000
+);
